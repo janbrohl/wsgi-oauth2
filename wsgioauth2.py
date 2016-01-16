@@ -42,10 +42,6 @@ try:
 except ImportError:
     import json
 import numbers
-try:
-    import cPickle as pickle
-except ImportError:
-    import pickle
 import random
 try:
     import urllib2
@@ -545,7 +541,7 @@ class WSGIMiddleware(object):
         """
         if not isinstance(value, bytes):
             raise TypeError('expected bytes, not ' + repr(value))
-        return hmac.new(self.secret, value, hashlib.sha1).hexdigest()
+        return hmac.new(self.secret, value, hashlib.sha512).hexdigest()
 
     def redirect(self, url, start_response, headers={}):
         h = {'Content-Type': 'text/html; charset=utf-8', 'Location': url}
@@ -618,7 +614,7 @@ class WSGIMiddleware(object):
             if not self.client.is_user_allowed(access_token):
                 return self.redirect(forbidden_uri, start_response)
 
-            session = pickle.dumps(access_token)
+            session = json.dumps(access_token)
             sig = self.sign(session)
             signed_session = sig.encode('ascii') + b',' + session
             signed_session = base64.urlsafe_b64encode(signed_session)
@@ -641,10 +637,10 @@ class WSGIMiddleware(object):
                     session = b''
                 if b',' in session:
                     sig, val = session.split(b',', 1)
-                    if sig.decode('ascii') == self.sign(val):
+                    if hmac.compare_digest(sig.decode('ascii'), self.sign(val)):
                         try:
-                            session = pickle.loads(val)
-                        except (pickle.UnpicklingError, ValueError):
+                            session = json.loads(val)
+                        except ValueError:
                             session = None
                     else:
                         session = None
